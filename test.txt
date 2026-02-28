@@ -1,0 +1,54 @@
+lear;
+clc;
+s=tf('s');
+P = bodeoptions; % Set phase visiblity to off and frequency units to Hz in options
+P.PhaseVisible = 'on';
+P.FreqUnits = 'Hz'; % Create plot with the options specified by P
+%Open loop response derived from ridley
+T_s=1e-6;L=4.3e-6;R_c=0;R_i=0.1;R1=280e3;
+Vin=[5];
+Radj=[20e3];
+C=[360e-6];
+gm=1.3e-3;Rc=10e3;Cc=33e-9;ro=100e6;
+Il=[1];
+for j=1:1
+    for i=1:1
+        Vout(i)=1/Radj(i)*(Radj(i)+R1);
+        R(i,j)=Vout(i)/Il(j);
+        R(i,j)=R(i,j)*(Radj(i)+R1)/(R(i,j)+Radj(i)+R1);
+        S_e=2.27e5;S_n=(Vin(i)-Vout(i))*R_i/L;
+        m_c(i)=1+S_e/S_n;
+        D=Vout(i)/(Vout(i)+Vin(i));
+        D_m=1-D;
+        w_n=pi/T_s;
+        %bode(T_i,{10,10e6},P)
+        %Control to output transfer function
+        w_p=1/(C(i)*R(i,j))+T_s*(m_c(i)*D_m-0.5)/(L*C(i));
+        F_p=(1+s*C(i)*R_c)/(1+s/w_p);
+        Q_p(i)=1/(pi*(m_c(i)*D_m-0.5));
+        F_h=1/(1+s/(w_n*Q_p(i))+s^2/w_n^2);
+        F_cto(i,j)=(R(i,j)/R_i)*(1/(1+R(i,j)*T_s*(m_c(i)*D_m-0.5)/L))*F_p*F_h;
+        M(i)=m_c(i)*D_m-0.5;
+        %F_cto=(R/(R_i*(1+R*T_s*M/L)))*((1+s*C*R_c)/((1+s*L*R*C/(L+M*R*T_s))*(
+        %1+s*pi*M/w_n+s^2/w_n^2)));%calculated equation
+ 
+        %Caculate output to FB,asume beta=1
+        %Zc=ro*(Rc+1/(s*Cc))/(ro+Rc+1/(s*Cc));
+        %F_fb=gm*Zc;
+        %F_fb=gm*ro*(1+s*Rc*Cc)/(1+s*(ro+Rc)*Cc);
+        Cz=0;
+        F_fb=gm*ro*(1+s*Rc*Cc)/(s*s*ro*Rc*Cc*Cz+s*((ro+Rc)*Cc+ro*Cz)+1);
+        %Caculate the voltage loop
+        Loop(i,j)=F_cto(i,j)*F_fb*(Radj(i)/(R1+Radj(i)));
+        CloseLoop(i,j)=Loop(i,j)/(1+Loop(i,j));
+        [Gm(i,j),Pm(i,j),Wg(i,j),Wp(i,j)] = margin(Loop(i,j));
+        Gain(i,j)= (R(i,j)/R_i)*(1/(1+R(i,j)*T_s*(m_c(i)*D_m-0.5)/L))*(Radj(i)/(R1+Radj(i)))*gm*ro;
+        bode(Loop(i,j),{10,10e6},P);
+        %hold on;
+    end
+ 
+end
+%plot results
+%bode(F_cto,{10,10e6},P);
+%bode(Loop,{10,10e6},P);
+                          
